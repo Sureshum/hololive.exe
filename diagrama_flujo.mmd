@@ -1,0 +1,44 @@
+%%{ init: { 'theme': 'dark', 'themeVariables': { 'primaryColor': '#0d0d1a', 'primaryTextColor': '#00FF41', 'primaryBorderColor': '#00FF41', 'lineColor': '#00FF41', 'secondaryColor': '#1a1a2e', 'tertiaryColor': '#16213e' } } }%%
+
+flowchart TD
+    A(["INICIO"]) --> B["Mostrar encabezado en consola"]
+    B --> C["Iniciar bucle de animacion\nlinea por linea"]
+    C --> D{"Quedan lineas\npor mostrar?"}
+
+    D -- SI --> E["Imprimir linea en verde brillante\ntexto aleatorio hacker"]
+    E --> F["time.sleep(random 0.4-1.0s)"]
+    F --> D
+
+    D -- NO --> G["Abrir navegador con\nGitHub.com/Sureshum"]
+    G --> H["Crear ventana raiz tkinter\npanel de control oculto"]
+    H --> I["Iniciar hilo para\nlanzar pop-ups"]
+    I --> J["Bucle principal\ntkinter.mainloop"]
+
+    J --> K{"Hay pop-ups\npendientes?"}
+
+    K -- SI --> L["Crear HololivePopup\nventana Toplevel"]
+    L --> M["Mostrar mensaje\naleatorio de Hololive"]
+    M --> N["Mostrar boton\nCERRAR"]
+    N --> O["time.sleep(random 1.5-3.0s)"]
+    O --> K
+
+    K -- NO --> P{"Esperando\nevento de cierre"}
+
+    P --> Q{"Usuario presiona\nboton CERRAR?"}
+    Q -- SI --> R["Cerrar ventana\nindividual"]
+    R --> S{"Quedan ventanas\nabiertas?"}
+    S -- SI --> P
+    S -- NO --> U
+
+    P --> T{"Usuario presiona\nEscape (tecla)?"}
+    T -- SI --> U["Cerrar TODAS\nlas ventanas de golpe"]
+
+    U --> V["Destruir panel\nde control"]
+    V --> W["Mostrar mensaje\nde despedida"]
+    W --> X(["FIN"])
+
+    style A fill:#1a1a2e,stroke:#00FF41,stroke-width:3px,color:#00FF41
+    style X fill:#1a1a2e,stroke:#FF0040,stroke-width:3px,color:#FF0040
+    style G fill:#16213e,stroke:#00FF41,stroke-width:2px,color:#00FF41
+    style L fill:#0d0d1a,stroke:#00CC00,stroke-width:2px,color:#39FF14
+    style U fill:#330000,stroke:#FF0040,stroke-width:2px,color:#FF0040
