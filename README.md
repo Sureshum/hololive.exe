@@ -4,8 +4,7 @@ No es un virus. Es un concierto de Hololive disfrazado de hackeo.
 
 Un script (o ejecutable) de broma que abre una "terminal de hacker", la
 anima un rato, enciende el navegador, y luego suelta un monton de ventanas
-emergentes con GIFs de tus vtubers favoritas mientras suena un "espiar al
-cursor" de Sakura Miko que se cree el dueño de tu mouse.
+emergentes con GIFs de tus vtubers favoritas mientras que Sakura Miko persigue tu mouse y se cree el dueño de tu mouse.
 
 **Es 100% inofensivo:** no modifica el registro, no instala nada, no roba
 datos, no es malicioso. Solo usa librerias estandar de Python y GIFs que se
@@ -51,7 +50,7 @@ o, si quieres ver la consola:
 python simulacion_hack.py
 ```
 
-## Como CERRAR TODO (importante)
+## Como CERRAR TODO (importante tienes que buscar la ventana que tiene el boton grande que dice cerrar todo)
 
 - **Boton `CERRAR TODO`** en el Panel de Control. Es el boton rojo, no te equivoques.
 - **Tecla `Escape`**.
@@ -74,5 +73,3 @@ python simulacion_hack.py
 - El exe se compila con PyInstaller: `pyinstaller --onefile --noconsole simulacion_hack.py`.
 - Los GIFs se cachean en memoria: cada uno se decodifica una sola vez.
 
-Hubo una vez que el archivo se corrompio a bytes nulos y se recupero desde el
-`.pyc` byte a byte. Ya no, eso queda en la leyenda.
