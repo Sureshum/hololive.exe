@@ -90,7 +90,12 @@ LINEAS_BOOT = [
 ]
 
 
-GIFS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gifs")
+if getattr(sys, "frozen", False):
+    DIR_BASE = os.path.dirname(sys.executable)
+else:
+    DIR_BASE = os.path.dirname(os.path.abspath(__file__))
+
+GIFS_DIR = os.path.join(DIR_BASE, "gifs")
 
 VERDE = "#39FF14"
 VERDE_OSC = "#0a3d0a"
