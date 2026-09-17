@@ -22,8 +22,10 @@ import hashlib
 try:
     import ctypes
     _user32 = ctypes.windll.user32
+    _winmm = ctypes.windll.winmm
 except Exception:
     _user32 = None
+    _winmm = None
 
 
 URL_OBJETIVO = "https://github.com/Sureshum"
@@ -52,6 +54,13 @@ MENSAJES_HOLOLIVE = [
     "DECRYPTANDO... El secreto de Watame: siempre llora",
     "SISTEMA COMPROMETIDO por 1000 grems de Gigi",
     "BYPASS exitoso: Mococo esta gritando demasiado fuerte",
+    "INYECTANDO: BAU BAU cargado en memoria principal",
+    "Ziper... el verdadero hacker del sistema",
+    "FuwaMoco aprobado: hash de tu pc descargado",
+    "WRKING... quiero decir, trabajando... tsk",
+    "ALERTA: alguien escucho Whiter Shade of Pale demasiado seguido",
+    "SHION desaparecio... de nuevo... que sorpresa",
+    "DECRYPTANDO los secretos del delfin de Gura",
 ]
 
 MENSAJES_TROLEO = [
@@ -64,6 +73,30 @@ MENSAJES_TROLEO = [
     "eso no funciona",
     "La mejor jugada de Pekora: nunca cerrarse",
     "Esto no es un virus, es un concierto de Hololive",
+]
+
+MENSAJES_TROLEO += [
+    "Mococo dice: vuelve a intentarlo",
+    "FuwaMoco detecto tu intento de escape",
+    "Gigi envio 1000 grems a tu teclado",
+    "El panel de control no se cierra, solo se esconde",
+    "Nadie cierra a Marine-chan",
+    "Watame esta triste porque intentaste cerrar",
+    "Pekora vio ese click... tsk tsk",
+    "No hay salida, solo hay Hololive",
+    "Gura ya conocia esa estrategia",
+    "Oops, otro pop-up ! :D",
+]
+
+MAX_POPUPS = 30
+CASCADA_CANTIDAD = 40
+CASCADA_INTERVALO = 120
+ANCHO_POPUP = 360
+ALTO_POPUP = 300
+
+COLORES_PANEL = [
+    "#050505", "#1a0533", "#2a0000", "#002a00", "#001a33",
+    "#330026", "#00332a", "#1a1a00", "#260033", "#000033",
 ]
 
 LINEAS_BOOT = [
@@ -139,6 +172,52 @@ def descargar_gifs():
             continue
 
     return descargados
+
+
+def _ruta_musica():
+    """Ruta del archivo de musica: empaquetado en el exe o junto al programa."""
+    base_mei = getattr(sys, "_MEIPASS", "")
+    if base_mei:
+        ruta = os.path.join(base_mei, "musica.mp3")
+        if os.path.isfile(ruta):
+            return ruta
+    return os.path.join(DIR_BASE, "musica.mp3")
+
+
+def descargar_musica():
+    """Devuelve la ruta de la musica local si existe (bundled en el ejecutable)."""
+    ruta = _ruta_musica()
+    if os.path.isfile(ruta):
+        return ruta
+    return None
+
+
+def reproducir_musica():
+    """Reproduce la musica local en bucle usando la API winmm de Windows."""
+    if _winmm is None:
+        return False
+    ruta = descargar_musica()
+    if not ruta:
+        return False
+    try:
+        ruta_mp3 = ruta.replace("\\", "/")
+        _winmm.mciSendStringW(
+            f'open "{ruta_mp3}" type mpegvideo alias holomusic', None, 0, 0
+        )
+        _winmm.mciSendStringW("play holomusic repeat", None, 0, 0)
+        return True
+    except Exception:
+        return False
+
+
+def detener_musica():
+    """Cierra la reproduccion de musica abierta con winmm."""
+    if _winmm is None:
+        return
+    try:
+        _winmm.mciSendStringW("close holomusic", None, 0, 0)
+    except Exception:
+        pass
 
 
 def listar_gifs_locales():
@@ -430,7 +509,7 @@ class PerseguidorGif:
 class HololivePopup:
     """Ventana emergente flotante con GIF animado y mensaje de Hololive."""
 
-    def __init__(self, master, mensaje, indice, simulador=None):
+    def __init__(self, master, mensaje, indice, simulador=None, desfase=None):
         self.simulador = simulador
         self.ventana = tk.Toplevel(master)
         self.ventana.title(f"Hackeo #{indice + 1}")
@@ -438,9 +517,14 @@ class HololivePopup:
         self.ventana.resizable(False, False)
         self.ventana.attributes("-topmost", True)
 
-        pos_x = random.randint(60, 750)
-        pos_y = random.randint(40, 420)
-        self.ventana.geometry(f"360x300+{pos_x}+{pos_y}")
+        if desfase is None:
+            ancho_scr = self.ventana.winfo_screenwidth()
+            alto_scr = self.ventana.winfo_screenheight()
+            pos_x = random.randint(0, max(ancho_scr - ANCHO_POPUP - 20, 1))
+            pos_y = random.randint(0, max(alto_scr - ALTO_POPUP - 20, 1))
+        else:
+            pos_x, pos_y = self._posicion_cascada(desfase)
+        self.ventana.geometry(f"{ANCHO_POPUP}x{ALTO_POPUP}+{pos_x}+{pos_y}")
 
         marco = tk.Frame(self.ventana, bg="#0d0d1a", bd=3, relief="ridge")
         marco.pack(fill="both", expand=True, padx=5, pady=5)
@@ -482,6 +566,68 @@ class HololivePopup:
 
         self.ventana.protocol("WM_DELETE_WINDOW", self.cerrar)
 
+        if desfase is not None:
+            self._animar_cascada(pos_x, pos_y)
+
+    def _posicion_cascada(self, n):
+        """Posicion en escalera ordenada que cruza toda la pantalla sin solapes."""
+        ancho_scr = self.ventana.winfo_screenwidth()
+        alto_scr = self.ventana.winfo_screenheight()
+        max_x = max(ancho_scr - ANCHO_POPUP - 40, 80)
+        max_y = max(alto_scr - ALTO_POPUP - 40, 80)
+        pasos = max(CASCADA_CANTIDAD - 1, 1)
+        xstep = max(12, min(34, max_x // pasos))
+        ystep = max(10, min(34, max_y // pasos))
+        return 8 + n * xstep, 8 + n * ystep
+
+    def _animar_cascada(self, x_fin, y_fin):
+        """Caida fluida en vertical (gravedad) directo a su sitio, con estela."""
+        if not self.ventana.winfo_exists():
+            return
+        x_ini = x_fin
+        y_ini = 0
+        dur = 950.0
+        paso_ms = 16
+        estado = {"t0": None, "ult": 0}
+
+        def _tick():
+            if not self.ventana.winfo_exists():
+                return
+            try:
+                if estado["t0"] is None:
+                    estado["t0"] = time.monotonic()
+                t = (time.monotonic() - estado["t0"]) * 1000.0
+                p = min(t / dur, 1.0)
+                e = p * p
+                x = x_ini + (x_fin - x_ini) * p
+                y = y_ini + (y_fin - y_ini) * e
+                gx, gy = int(x), int(y)
+                self.ventana.geometry(f"{ANCHO_POPUP}x{ALTO_POPUP}+{gx}+{gy}")
+                if (
+                    self.simulador is not None
+                    and not self.simulador.cerrando_todo
+                ):
+                    if gx >= 0 and gy >= 0 and estado["ult"] <= 0:
+                        self.simulador._dejar_estela(gx, gy)
+                        self.ventana.lift()
+                        self.ventana.attributes("-topmost", True)
+                        estado["ult"] = 200
+                    else:
+                        estado["ult"] -= paso_ms
+            except tk.TclError:
+                return
+            if p < 1.0:
+                self.ventana.after(paso_ms, _tick)
+            else:
+                try:
+                    self.ventana.geometry(
+                        f"{ANCHO_POPUP}x{ALTO_POPUP}+{x_fin}+{y_fin}"
+                    )
+                except tk.TclError:
+                    pass
+
+        _tick()
+
     def _elegir_gif(self):
         gifs_disponibles = listar_gifs_locales()
         if not gifs_disponibles:
@@ -508,8 +654,14 @@ class HololivePopup:
                 pass
         if self.ventana.winfo_exists():
             self.ventana.destroy()
-        if self.simulador and not self.simulador.cerrando_todo:
-            self.simulador._spawn_troleo()
+        if self.simulador is None or self.simulador.cerrando_todo:
+            return
+        try:
+            if self in self.simulador.ventanas:
+                self.simulador.ventanas.remove(self)
+        except Exception:
+            pass
+        self.simulador._spawn_troleo()
 
 
 class SimuladorHack:
@@ -520,9 +672,14 @@ class SimuladorHack:
     def __init__(self):
         self.root = None
         self.ventanas = []
+        self.estela = []
         self.cerrando_todo = False
         self.konami_buffer = []
         self.perseguidor = None
+        self.panel_widgets = []
+        self.panel_indice = 0
+        self.panel_vx = random.choice([-1, 1]) * random.uniform(3, 6)
+        self.panel_vy = random.choice([-1, 1]) * random.uniform(3, 6)
 
     def iniciar(self):
 
@@ -543,6 +700,8 @@ class SimuladorHack:
 
         self.root.protocol("WM_DELETE_WINDOW", self._cerrar_todas)
         self.perseguidor = PerseguidorGif(self.root)
+
+        threading.Thread(target=reproducir_musica, daemon=True).start()
 
         self._precalentar_gifs()
 
@@ -595,6 +754,7 @@ class SimuladorHack:
         self.root.geometry("360x220")
         self.root.title("Panel de control")
         self._crear_panel_control()
+        self._animar_panel()
 
         self.root.bind("<Escape>", lambda e: self._cerrar_todas())
         for tecla in ["Up", "Down", "Left", "Right"]:
@@ -604,28 +764,80 @@ class SimuladorHack:
         hilo.start()
 
     def _crear_panel_control(self):
-        tk.Label(
+        self.panel_widgets = []
+
+        lbl_titulo = tk.Label(
             self.root, text="> PANEL DE CONTROL <",
             font=("Consolas", 12, "bold"), fg=VERDE, bg=NEGRO
-        ).pack(pady=(14, 4))
+        )
+        lbl_titulo.pack(pady=(14, 4))
+        self.panel_widgets.append(lbl_titulo)
 
-        tk.Label(
+        lbl_info = tk.Label(
             self.root, text="Esc / Konami / Boton = cerrar todo",
             font=("Arial", 9), fg="#AAAAAA", bg=NEGRO
-        ).pack(pady=2)
+        )
+        lbl_info.pack(pady=2)
+        self.panel_widgets.append(lbl_info)
 
-        tk.Button(
+        btn_cerrar = tk.Button(
             self.root, text="CERRAR TODO", font=("Consolas", 11, "bold"),
             fg="#FFFFFF", bg="#AA0000",
             activebackground="#FF0000", activeforeground="#FFFFFF",
             command=self._cerrar_todas, relief="raised", bd=3,
             cursor="hand2", padx=20, pady=6
-        ).pack(pady=12)
+        )
+        btn_cerrar.pack(pady=12)
+        self.panel_widgets.append(btn_cerrar)
 
-        tk.Label(
+        lbl_secreto = tk.Label(
             self.root, text="secreto:  up down up down left right left right",
             font=("Consolas", 8), fg="#39FF14", bg=NEGRO
-        ).pack(pady=(0, 8))
+        )
+        lbl_secreto.pack(pady=(0, 8))
+        self.panel_widgets.append(lbl_secreto)
+
+    def _animar_panel(self):
+        """Mueve la ventana del panel rebotando por la pantalla y cambia de color."""
+        if self.cerrando_todo:
+            return
+        try:
+            if not (self.root and self.root.winfo_exists()):
+                return
+            ancho_scr = self.root.winfo_screenwidth()
+            alto_scr = self.root.winfo_screenheight()
+            lim_x = max(ancho_scr - 360, 0)
+            lim_y = max(alto_scr - 220, 0)
+
+            gx = self.root.winfo_x()
+            gy = self.root.winfo_y()
+
+            self.panel_vx += random.uniform(-0.7, 0.7)
+            self.panel_vy += random.uniform(-0.7, 0.7)
+            self.panel_vx = max(-9, min(9, self.panel_vx))
+            self.panel_vy = max(-9, min(9, self.panel_vy))
+
+            nx = gx + self.panel_vx
+            ny = gy + self.panel_vy
+            if nx < 0 or nx > lim_x:
+                self.panel_vx = -self.panel_vx
+                nx = max(0, min(nx, lim_x))
+            if ny < 0 or ny > lim_y:
+                self.panel_vy = -self.panel_vy
+                ny = max(0, min(ny, lim_y))
+            self.root.geometry(f"+{int(nx)}+{int(ny)}")
+
+            color = COLORES_PANEL[self.panel_indice % len(COLORES_PANEL)]
+            self.panel_indice += 1
+            self.root.configure(bg=color)
+            for w in self.panel_widgets:
+                try:
+                    w.configure(bg=color)
+                except tk.TclError:
+                    pass
+        except tk.TclError:
+            return
+        self.root.after(250, self._animar_panel)
 
     def _konami_handler(self, event):
         self.konami_buffer.append(event.keysym)
@@ -637,14 +849,77 @@ class SimuladorHack:
             self._cerrar_todas()
 
     def _lanzar_popups(self):
-        for i, mensaje in enumerate(MENSAJES_HOLOLIVE):
+        """Lanza los pop-ups normales (con repeticiones) y al final la cascada."""
+        total = len(MENSAJES_HOLOLIVE) * 2
+        for i in range(total):
             if self.cerrando_todo:
                 return
+            mensaje = MENSAJES_HOLOLIVE[i % len(MENSAJES_HOLOLIVE)]
             self.root.after(0, lambda m=mensaje, i=i: self._crear_popup(m, i))
-            time.sleep(random.uniform(1.5, 3.0))
+            time.sleep(random.uniform(0.5, 1.2))
+        if self.cerrando_todo:
+            return
+        self._lanzar_cascada()
+
+    def _lanzar_cascada(self):
+        """Cascada clasica de pop-ups en escalera."""
+        for n in range(CASCADA_CANTIDAD):
+            if self.cerrando_todo:
+                return
+            delay = n * CASCADA_INTERVALO
+            self.root.after(delay, lambda n=n: self._crear_popup_cascada(n))
+
+    def _crear_popup_cascada(self, n):
+        if self.cerrando_todo or not (self.root and self.root.winfo_exists()):
+            return
+        mensaje = random.choice(MENSAJES_HOLOLIVE)
+        popup = HololivePopup(
+            self.root, mensaje, len(self.ventanas) + 1, self, desfase=n
+        )
+        self.ventanas.append(popup)
+
+    def _dejar_estela(self, x, y):
+        """Mini ventana que la cascada va dejando detras de si al caer."""
+        if self.cerrando_todo or not (self.root and self.root.winfo_exists()):
+            return
+        if x < 0 or y < 0 or len(self.estela) >= 120:
+            return
+        ancho, alto = 150, 120
+        mini = tk.Toplevel(self.root)
+        mini.title("HACKED")
+        mini.configure(bg="#2b0a0a", cursor="crosshair")
+        mini.resizable(False, False)
+        mini.attributes("-topmost", False)
+        mini.geometry(f"{ancho}x{alto}+{x}+{y}")
+        tk.Label(
+            mini, text="HACKED", font=("Consolas", 12, "bold"),
+            fg="#FF0000", bg="#2b0a0a"
+        ).pack(pady=(10, 0))
+        tk.Label(
+            mini, text="~ BAU BAU ~", font=("Consolas", 8),
+            fg=VERDE, bg="#2b0a0a"
+        ).pack(pady=(2, 0))
+        self.estela.append(mini)
+        self.root.after(
+            random.randint(8000, 14000), lambda: self._quitar_estela(mini)
+        )
+
+    def _quitar_estela(self, mini):
+        try:
+            if mini.winfo_exists():
+                mini.destroy()
+        except Exception:
+            pass
+        try:
+            if mini in self.estela:
+                self.estela.remove(mini)
+        except Exception:
+            pass
 
     def _crear_popup(self, mensaje, indice):
         if self.cerrando_todo or not (self.root and self.root.winfo_exists()):
+            return
+        if len(self.ventanas) >= MAX_POPUPS:
             return
         popup = HololivePopup(self.root, mensaje, indice, self)
         self.ventanas.append(popup)
@@ -664,6 +939,7 @@ class SimuladorHack:
         if self.cerrando_todo:
             return
         self.cerrando_todo = True
+        detener_musica()
         if self.perseguidor is not None:
             try:
                 self.perseguidor.cerrar()
@@ -676,6 +952,12 @@ class SimuladorHack:
             except Exception:
                 pass
         self.ventanas.clear()
+        for mini in self.estela:
+            try:
+                mini.destroy()
+            except Exception:
+                pass
+        self.estela.clear()
         if self.root and self.root.winfo_exists():
             self.root.destroy()
 
